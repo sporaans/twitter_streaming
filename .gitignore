@@ -1,0 +1,19 @@
+*.class
+*.log
+*.iml
+
+# sbt specific
+.bsp/
+.cache
+.history
+.lib/
+.idea/
+.bloop/
+.metals/
+.vscode/
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+null/
