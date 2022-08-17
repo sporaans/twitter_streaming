@@ -17,3 +17,7 @@ src_managed/
 project/boot/
 project/plugins/project/
 null/
+src/node/package-lock.json
+src/node/package.json
+src/node/node_modules/
+src/main/resources/application.properties

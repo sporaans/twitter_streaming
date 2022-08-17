@@ -1,11 +1,12 @@
 
-name := "test-project"
-organization := "com.test"
+name := "twitter-streaming"
+organization := "com.twitter"
 scalaVersion := "2.12.10"
 version := "1"
 
 
 val sparkVersion = "3.0.0"
+val circeVersion = "0.13.0"
 
 libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-core" % sparkVersion % "provided",
@@ -16,7 +17,13 @@ libraryDependencies ++= Seq(
   "org.apache.spark" %% "spark-sql-kafka-0-10" % sparkVersion,
   "org.apache.bahir" %% "spark-streaming-twitter" % "2.4.0",
   "org.apache.kafka" % "kafka_2.12" % "3.2.1",
-  "com.datastax.spark" %% "spark-cassandra-connector" % "3.2.0"
+  "com.datastax.spark" %% "spark-cassandra-connector" % "3.2.0",
+  "com.datastax.cassandra" % "cassandra-driver-core" % "3.3.0",
+  "io.circe" %% "circe-core" % circeVersion,
+  "io.circe" %% "circe-generic" % circeVersion,
+  "io.circe" %% "circe-generic-extras" % circeVersion,
+  "io.circe" %% "circe-optics" % circeVersion,
+  "io.circe" %% "circe-parser" % circeVersion
 )
 
 

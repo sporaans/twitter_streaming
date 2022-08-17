@@ -2,6 +2,9 @@ package com.twitter
 
 
 import com.typesafe.config.ConfigFactory
+import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
+import io.circe.syntax._
+import io.circe.{Decoder, Encoder}
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerRecord}
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming.twitter._
@@ -10,13 +13,25 @@ import org.slf4j.LoggerFactory
 import twitter4j.Status
 
 import java.io._
+import java.time.LocalDateTime
 import java.util.Properties
+import scala.util.Try
 
 object ProducerTwitter {
 
   val logger = LoggerFactory.getLogger(this.getClass)
 
-//    case class CLIParams(hdfsMaster: String = "", filters: Array[String] = Array.empty)
+  case class Tweet(tweetId:Long,
+                   user: String,
+                   isRetweet: Boolean,
+                   replyUserId: Long,
+                   quotedStatusId: Long,
+                   countryCode: String,
+                   source: String,
+                   text: String,
+                   language: String,
+                   created: LocalDateTime
+                  )
 
   def main(args:Array[String]): Unit = {
 
@@ -33,29 +48,52 @@ object ProducerTwitter {
     System.setProperty("twitter4j.oauth.accessTokenSecret", accessTokenSecret)
 
     val sparkConf = new SparkConf()
-      .setAppName("TwitterPopularTags")
+      .setAppName("TwitterProducer")
       .setMaster("local[*]")
     val ssc = new StreamingContext(sparkConf, Seconds(10))
 
-    val x = ssc.sparkContext.parallelize(Array(1, 2, 3))
-    x.foreach(println(_))
     val stream = TwitterUtils.createStream(ssc, None, Array("iPhone"))
 
-    stream.foreachRDD((rdd,ts) =>{
+    stream.foreachRDD((rdd,ts) => {
       if (!rdd.partitions.isEmpty) {
-        sendToKafka(rdd.collect())
+        rdd.repartition(2)
+        rdd.zipWithIndex().foreachPartition(it=>sendToKafka(generateJson(it.toArray)))
       }
     })
 
     ssc.start()
     ssc.awaitTermination()
   }
+
   def printToFile(f: java.io.File)(op: java.io.PrintWriter => Unit) {
     val p = new java.io.PrintWriter(new FileOutputStream(f,true))
     try { op(p) } finally { p.close() }
   }
 
-  def sendToKafka(tweets:Array[Status]) = {
+  def generateJson (tweets:Array[(Status,Long)]):Array[String] = {
+    implicit val tweetDecoder: Decoder[Tweet] = deriveDecoder
+    implicit val tweetEncoder: Encoder[Tweet] = deriveEncoder
+
+    tweets.map( tweet => {
+      val tweetStatus = tweet._1
+      val tweetCountryCode = Try(tweetStatus.getPlace.getCountryCode).toOption.getOrElse("none")
+      val tweetObj = Tweet(
+        tweetStatus.getId,
+        tweetStatus.getUser.getName,
+        tweetStatus.isRetweet,
+        tweetStatus.getInReplyToUserId,
+        tweetStatus.getQuotedStatusId,
+        tweetCountryCode,
+        tweetStatus.getSource,
+        tweetStatus.getText,
+        tweetStatus.getLang,
+        LocalDateTime.now()
+      )
+      tweetObj.asJson.noSpaces
+    })
+  }
+
+  def sendToKafka(tweets:Array[String]) = {
     val props:Properties = new Properties()
     props.put("bootstrap.servers","localhost:9092")
     props.put("key.serializer",
@@ -64,11 +102,10 @@ object ProducerTwitter {
       "org.apache.kafka.common.serialization.StringSerializer")
     props.put("acks","all")
     val producer = new KafkaProducer[String, String](props)
-    val topic = "scala_events"
+    val topic = "tweets_topic"
     try {
-      tweets.map(tweet => {
-        val message = tweet.getUser.getName
-        val record = new ProducerRecord[String, String](topic, toString, message)
+      tweets.foreach(tweet => {
+        val record = new ProducerRecord[String, String](topic, toString, tweet)
         val metadata = producer.send(record)
         printf(s"sent record(key=%s value=%s) " +
           "meta(partition=%d, offset=%d)\n",

@@ -1,0 +1,319 @@
+<html>
+  <head>
+    <link
+      rel="stylesheet"
+      href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+      integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z"
+      crossorigin="anonymous"
+    />
+    <script
+      src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+      integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/popper.js@1.16.1/dist/umd/popper.min.js"
+      integrity="sha384-9/reFTGAW83EW2RDu2S0VKaIzap3H66lZH81PoYlFhbGU+6BZp6G7niu735Sk7lN"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"
+      integrity="sha384-B4gt1jrGC7Jh4AgTPSdUtOBvfO8shuf57BaghqFfPlYxofvL8/KUEfYiJOMMV+rV"
+      crossorigin="anonymous"
+    ></script>
+    <script src="http://localhost:8080/socket.io/socket.io.js"></script>
+    <script src="http://code.highcharts.com/highcharts.js"></script>
+    <script src="https://code.highcharts.com/modules/data.js"></script>
+    <script src="https://code.highcharts.com/modules/series-label.js"></script>
+    <script src="https://code.highcharts.com/maps/modules/map.js"></script>
+    <script src="https://code.highcharts.com/mapdata/custom/world.js"></script>
+  </head>
+  <body>
+    <div>
+      <div id="types_chart" style="float: left; width: 50%"></div>
+      <div id="tweet_counts" style="float: right; width: 50%"></div>
+    </div>
+
+    <div>
+      <div id="platform_container" style="float: left; width: 50%"></div>
+      <div id="languages_container" style="float: right; width: 50%"></div>
+    </div>
+
+    <script>
+      var timeWindow = 60000;
+      var socket = io.connect("http://localhost:8080");
+
+      var requestsChart = new Highcharts.chart("types_chart", {
+        chart: {
+          zoomType: "x",
+          borderWidth: 1,
+          marginRight: 10,
+          type: "column",
+          events: {
+            load: function () {
+              let series = this.series;
+              socket.on("types_data", function (data) {
+                const currentTime = new Date().getTime();
+                series.forEach(function (serie) {
+                  data.forEach(function (sample) {
+                    console.log(sample)
+                    if (sample.type == serie.name) {
+                      let count = parseInt(sample.count)
+                        // new Date(sample.timestamp).getTime() + timeWindow >=
+                        // currentTime
+                        //   ? sample.count
+                        //   : 0;
+                      serie.addPoint([currentTime, count], false, false);
+                    }
+                  });
+                });
+                requestsChart.redraw();
+              });
+            },
+          },
+        },
+        title: {
+          text: "Tweets per minute",
+        },
+        xAxis: {
+          title: {
+            text: "Time",
+          },
+          type: "datetime",
+          tickPixelInterval: 30,
+        },
+        yAxis: {
+          min: 0,
+          title: {
+            text: "Tweets",
+          },
+        },
+        legend: {
+          enabled: true,
+          title: {
+            text: "Tweet Type",
+          },
+        },
+        credits: {
+          enabled: false,
+        },
+        time: {
+          useUTC: false,
+        },
+        plotOptions: {
+          series: {
+            stacking: "normal",
+          },
+        },
+        exporting: {
+          enabled: true,
+        },
+        series: [
+          {
+            name: "Regular tweet",
+            color: "#FF0000",
+            pointInterval: 3600,
+          },
+          {
+            name: "Retweet",
+            color: "#884EA0",
+            pointInterval: 3600,
+          },
+          {
+            name: "Reply",
+            color: "#D4AC0D",
+            pointInterval: 3600,
+          },
+          {
+            name: "Quote",
+            color: "#28B463",
+            pointInterval: 3600,
+          },
+        ],
+      });
+
+      var ordersGraph = new Highcharts.chart("tweet_counts", {
+        chart: {
+          type: "spline",
+          borderWidth: 1,
+          animation: Highcharts.svg, // don't animate in old IE
+          marginRight: 10,
+          events: {
+            load: function () {
+              let series = this.series[0];
+              socket.on("tweet_count_data", function (sample) {
+                //Update series
+                const currentTime = new Date().getTime();
+                if ( true
+                  // new Date(sample.timestamp).getTime() + timeWindow >=
+                  // currentTime
+                ) {
+                  series.addPoint(
+                    [currentTime, parseInt(sample.count)],
+                    true,
+                    false,
+                    true
+                  );
+                }
+              });
+            },
+          },
+        },
+        title: {
+          text: "Tweet Count",
+        },
+        xAxis: {
+          title: {
+            text: "Time",
+          },
+          type: "datetime",
+          tickPixelInterval: 30,
+        },
+        yAxis: {
+          min: 0,
+          title: {
+            text: "Number of Tweets",
+            align: "high",
+          },
+          labels: {
+            overflow: "justify",
+          },
+        },
+        time: {
+          useUTC: false,
+        },
+        legend: {
+          enabled: false,
+        },
+        exporting: {
+          enabled: true,
+        },
+        credits: {
+          enabled: false,
+        },
+        series: [
+          {
+            name: "Tweets",
+          },
+        ],
+      });
+
+
+      var osGraph = new Highcharts.chart("platform_container", {
+        chart: {
+          plotBackgroundColor: null,
+          plotBorderWidth: null,
+          plotShadow: false,
+          type: "pie",
+          events: {
+            load: function () {
+              let series = this.series[0];
+              socket.on("platform_data", function (samples) {
+                let data = [];
+                const currentTime = new Date().getTime();
+                samples.forEach(function (sample) {
+                  if ( true
+                    // new Date(sample.timestamp).getTime() + timeWindow >=
+                    // currentTime
+                  ) {
+                    data.push([sample.platform, parseInt(sample.count)]);
+                  }
+                });
+                series.setData(data, true, false, true);
+              });
+            },
+          },
+        },
+        title: {
+          text: "Tweets by Platform",
+        },
+        tooltip: {
+          pointFormat: "{series.name}: <b>{point.percentage:.1f}%</b>",
+        },
+        accessibility: {
+          point: {
+            valueSuffix: "%",
+          },
+        },
+        credits: {
+          enabled: false,
+        },
+        plotOptions: {
+          pie: {
+            allowPointSelect: true,
+            cursor: "pointer",
+            dataLabels: {
+              enabled: true,
+              format: "<b>{point.name}</b>: {point.percentage:.1f} %",
+            },
+          },
+        },
+        series: [
+          {
+            name: "Platform",
+            colorByPoint: true,
+            data: [],
+          },
+        ],
+      });
+
+      var browsersGraph = new Highcharts.chart("languages_container", {
+        chart: {
+          plotBackgroundColor: null,
+          plotBorderWidth: null,
+          plotShadow: false,
+          type: "pie",
+          events: {
+            load: function () {
+              let series = this.series[0];
+              socket.on("language_data", function (samples) {
+                let data = [];
+                const currentTime = new Date().getTime();
+                samples.forEach(function (sample) {
+                  if ( true
+                    // new Date(sample.timestamp).getTime() + timeWindow >=
+                    // currentTime
+                  ) {
+                    data.push([sample.language, parseInt(sample.count)]);
+                  }
+                });
+                series.setData(data, true, false, true);
+              });
+            },
+          },
+        },
+        title: {
+          text: "Languages used in Tweets",
+        },
+        tooltip: {
+          pointFormat: "{series.name}: <b>{point.percentage:.1f}%</b>",
+        },
+        accessibility: {
+          point: {
+            valueSuffix: "%",
+          },
+        },
+        credits: {
+          enabled: false,
+        },
+        plotOptions: {
+          pie: {
+            allowPointSelect: true,
+            cursor: "pointer",
+            dataLabels: {
+              enabled: true,
+              format: "<b>{point.name}</b>: {point.percentage:.1f} %",
+            },
+          },
+        },
+        series: [
+          {
+            name: "Language",
+            colorByPoint: true,
+            data: [],
+          },
+        ],
+      });
+    </script>
+  </body>
+</html>

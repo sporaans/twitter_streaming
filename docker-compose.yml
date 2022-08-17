@@ -14,8 +14,11 @@ services:
     environment:
       KAFKA_ADVERTISED_HOST_NAME: localhost
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_CREATE_TOPICS: "tweets_topic:2:1"
   cassandra:
     image: bitnami/cassandra:latest
     container_name: cassandra
     ports:
       - "9042:9042"
+    environment:
+      CASSANDRA_ENABLE_USER_DEFINED_FUNCTIONS: true
